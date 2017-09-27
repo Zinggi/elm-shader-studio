@@ -78,11 +78,12 @@ type alias Config varyings =
 
 {-| -}
 type alias Uniforms =
-    { camera : Mat4
+    { projectionMatrix : Mat4
     , lightPosition : Vec3
     , modelMatrix : Mat4
     , modelViewProjectionMatrix : Mat4
-    , mvMat : Mat4
+    , normalMatrix : Mat4
+    , modelViewMatrix : Mat4
     , textureDiff : Texture
     , textureNorm : Texture
     , viewPosition : Vec3
@@ -215,7 +216,7 @@ update msg model =
 renderModel : Config v -> Model -> Mesh Attributes -> Texture -> Texture -> Entity
 renderModel config model mesh textureDiff textureNorm =
     let
-        ( camera, view, viewProjection, cameraPos ) =
+        ( proj, view, viewProjection, cameraPos ) =
             getCamera model
 
         modelM =
@@ -225,10 +226,11 @@ renderModel config model mesh textureDiff textureNorm =
             vec3 (0.5 * cos (2 * model.time)) (1 + 0.5 * sin (2 * model.time)) 0.5
 
         uniforms =
-            { camera = camera
-            , mvMat = M4.mul view modelM
+            { projectionMatrix = proj
+            , modelViewMatrix = M4.mul view modelM
             , modelViewProjectionMatrix = M4.mul viewProjection modelM
             , modelMatrix = modelM
+            , normalMatrix = modelM
             , viewPosition = cameraPos
             , textureDiff = textureDiff
             , textureNorm = textureNorm
