@@ -34,7 +34,7 @@ import Html.Events exposing (on, onInput, onCheck)
 import Json.Decode as JD
 import Math.Matrix4 as M4 exposing (Mat4)
 import Math.Vector4 as V4 exposing (Vec4)
-import Math.Vector3 as V3 exposing (Vec3, vec3)
+import Math.Vector3 as V3 exposing (Vec3, vec3, toRecord, setX, setY, setZ)
 import Math.Vector2 as V2 exposing (Vec2)
 import Task
 import WebGL as GL exposing (Shader, Texture, Mesh, Entity)
@@ -115,6 +115,7 @@ type alias Model =
     , mouseDelta : MouseDelta
     , windowSize : Window.Size
     , paused : Bool
+    , lightPosition : Vec3
     }
 
 
@@ -135,6 +136,7 @@ initModel config =
     , mouseDelta = MouseDelta 0 (pi / 2)
     , windowSize = Window.Size 800 600
     , paused = True
+    , lightPosition = vec3 3 0 0
     }
 
 
@@ -169,6 +171,7 @@ type Msg
     | SelectNormText String
     | ResizeWindow Window.Size
     | SelectMesh String
+    | SetLightPos Vec3
     | TogglePause
 
 
@@ -208,6 +211,9 @@ update msg model =
         TogglePause ->
             ( { model | paused = not model.paused }, Cmd.none )
 
+        SetLightPos v ->
+            ( { model | lightPosition = v }, Cmd.none )
+
 
 
 -- VIEW / RENDER
@@ -223,7 +229,8 @@ renderModel config model mesh textureDiff textureNorm =
             M4.identity
 
         lightPos =
-            vec3 (0.5 * cos (2 * model.time)) (1 + 0.5 * sin (2 * model.time)) 0.5
+            -- vec3 (0.5 * cos (2 * model.time)) (1 + 0.5 * sin (2 * model.time)) 0.5
+            model.lightPosition
 
         uniforms =
             { projectionMatrix = proj
@@ -283,22 +290,101 @@ view config model =
 uiView : Config v -> Model -> Html Msg
 uiView config model =
     div [ Attr.style [ ( "position", "absolute" ), ( "z-index", "2" ), ( "backgroundColor", "white" ) ] ]
-        [ Html.select [ onInput SelectMesh, Attr.value model.currentModel ]
-            (makeOptions (Dict.keys meshes))
-        , Html.text "paused: "
-        , Html.input
-            [ Attr.type_ "checkbox"
-            , Attr.checked model.paused
-            , onCheck (always TogglePause)
+        [ div []
+            [ Html.select [ onInput SelectMesh, Attr.value model.currentModel ]
+                (makeOptions (Dict.keys meshes))
+            , Html.text "paused: "
+            , Html.input
+                [ Attr.type_ "checkbox"
+                , Attr.checked model.paused
+                , onCheck (always TogglePause)
+                ]
+                []
+            , Html.text "diffuse texture: "
+            , Html.select [ onInput SelectDiffText, Attr.value model.diffText ]
+                (makeOptions (allTextures config))
+            , Html.text "normal map"
+            , Html.select [ onInput SelectNormText, Attr.value model.normText ]
+                (makeOptions (allTextures config))
             ]
-            []
-        , Html.text "diffuse texture: "
-        , Html.select [ onInput SelectDiffText, Attr.value model.diffText ]
-            (makeOptions (allTextures config))
-        , Html.text "normal map"
-        , Html.select [ onInput SelectNormText, Attr.value model.normText ]
-            (makeOptions (allTextures config))
+        , div [] [ vec3Input SetLightPos model.lightPosition, vec3SphericalInput SetLightPos model.lightPosition ]
         ]
+
+
+vec3SphericalInput : (Vec3 -> msg) -> Vec3 -> Html msg
+vec3SphericalInput toMsg v =
+    let
+        v2 =
+            toSpherical v
+
+        stringToMsg setter n =
+            String.toFloat n
+                |> Result.withDefault 0.0
+                |> (\x -> setter x v)
+                |> fromSpherical
+                |> toMsg
+
+        singleInput txt value setter =
+            [ Html.text txt
+            , Html.input [ Attr.type_ "number", onInput identity, Attr.step "0.01", Attr.value (toString value) ] []
+                |> Html.map (stringToMsg setter)
+            ]
+    in
+        div []
+            (List.concat
+                [ singleInput "Rho: " (V3.getX v2) setX
+                , singleInput "Phi: " (V3.getY v2) setY
+                , singleInput "R: " (V3.getZ v2) setZ
+                ]
+            )
+
+
+fromSpherical : Vec3 -> Vec3
+fromSpherical v =
+    let
+        { x, y, z } =
+            toRecord v
+    in
+        vec3 (z * sin x * cos y) (z * sin x * sin y) (z * cos x)
+
+
+toSpherical : Vec3 -> Vec3
+toSpherical v =
+    let
+        { x, y, z } =
+            toRecord v
+
+        r =
+            V3.length v
+    in
+        vec3 (acos (z / r)) (atan (y / x)) r
+
+
+vec3Input : (Vec3 -> msg) -> Vec3 -> Html msg
+vec3Input toMsg v =
+    let
+        { x, y, z } =
+            toRecord v
+
+        stringToMsg setter n =
+            String.toFloat n
+                |> Result.withDefault 0.0
+                |> (\x -> setter x v)
+                |> toMsg
+
+        singleInput txt value setter =
+            [ Html.text txt
+            , Html.input [ Attr.type_ "number", onInput identity, Attr.step "0.01", Attr.value (toString value) ] []
+                |> Html.map (stringToMsg setter)
+            ]
+    in
+        div []
+            (List.concat
+                [ singleInput "x: " x setX
+                , singleInput "y: " y setY
+                , singleInput "z: " z setZ
+                ]
+            )
 
 
 allTextures config =
