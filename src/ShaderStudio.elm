@@ -76,7 +76,10 @@ type alias Config varyings =
     }
 
 
-{-| -}
+{-| Here are the uniforms that shader studio provides for you.
+The lightPosition is provided in view space, that is its coordinates
+are relative to the camera.
+-}
 type alias Uniforms =
     { projectionMatrix : Mat4
     , lightPosition : Vec3
@@ -86,7 +89,6 @@ type alias Uniforms =
     , modelViewMatrix : Mat4
     , textureDiff : Texture
     , textureNorm : Texture
-    , viewPosition : Vec3
     }
 
 
@@ -237,11 +239,15 @@ renderModel config model mesh textureDiff textureNorm =
             , modelViewMatrix = M4.mul view modelM
             , modelViewProjectionMatrix = M4.mul viewProjection modelM
             , modelMatrix = modelM
-            , normalMatrix = modelM
-            , viewPosition = cameraPos
+
+            -- the normal matrix should be the same as the modelViewMatrix, except it shouldn't contain any scaling
+            -- in our case (since the model matrix is the identity) we can just use the view matrix
+            , normalMatrix = view
             , textureDiff = textureDiff
             , textureNorm = textureNorm
-            , lightPosition = lightPos
+
+            -- since we usually calculate the lightning in view space, transform the light position here
+            , lightPosition = M4.transform view lightPos
             }
     in
         renderCullFace config.vertexShader config.fragmentShader mesh uniforms
@@ -307,7 +313,10 @@ uiView config model =
             , Html.select [ onInput SelectNormText, Attr.value model.normText ]
                 (makeOptions (allTextures config))
             ]
-        , div [] [ vec3Input SetLightPos model.lightPosition, vec3SphericalInput SetLightPos model.lightPosition ]
+        , div []
+            [ vec3Input SetLightPos model.lightPosition
+            , vec3SphericalInput SetLightPos model.lightPosition
+            ]
         ]
 
 
@@ -320,7 +329,7 @@ vec3SphericalInput toMsg v =
         stringToMsg setter n =
             String.toFloat n
                 |> Result.withDefault 0.0
-                |> (\x -> setter x v)
+                |> (\x -> setter x v2)
                 |> fromSpherical
                 |> toMsg
 
@@ -357,7 +366,7 @@ toSpherical v =
         r =
             V3.length v
     in
-        vec3 (acos (z / r)) (atan (y / x)) r
+        vec3 (acos (z / r)) (atan2 y x) r
 
 
 vec3Input : (Vec3 -> msg) -> Vec3 -> Html msg
