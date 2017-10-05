@@ -138,10 +138,11 @@ initModel config =
     , mouseDelta = MouseDelta 0 (pi / 2)
     , windowSize = Window.Size 800 600
     , paused = True
-    , lightPosition = vec3 3 0 0
+    , lightPosition = vec3 0 0 2
     }
 
 
+tryFindNormalMap : Config v -> String
 tryFindNormalMap config =
     config.textures
         |> List.filter (\i -> Regex.contains (Regex.caseInsensitive (regex "norm")) i)
@@ -309,64 +310,15 @@ uiView config model =
             , Html.text "diffuse texture: "
             , Html.select [ onInput SelectDiffText, Attr.value model.diffText ]
                 (makeOptions (allTextures config))
-            , Html.text "normal map"
+            , Html.text "normal map: "
             , Html.select [ onInput SelectNormText, Attr.value model.normText ]
                 (makeOptions (allTextures config))
             ]
         , div []
-            [ vec3Input SetLightPos model.lightPosition
-            , vec3SphericalInput SetLightPos model.lightPosition
+            [ Html.text "light position: "
+            , vec3Input SetLightPos model.lightPosition
             ]
         ]
-
-
-vec3SphericalInput : (Vec3 -> msg) -> Vec3 -> Html msg
-vec3SphericalInput toMsg v =
-    let
-        v2 =
-            toSpherical v
-
-        stringToMsg setter n =
-            String.toFloat n
-                |> Result.withDefault 0.0
-                |> (\x -> setter x v2)
-                |> fromSpherical
-                |> toMsg
-
-        singleInput txt value setter =
-            [ Html.text txt
-            , Html.input [ Attr.type_ "number", onInput identity, Attr.step "0.01", Attr.value (toString value) ] []
-                |> Html.map (stringToMsg setter)
-            ]
-    in
-        div []
-            (List.concat
-                [ singleInput "Rho: " (V3.getX v2) setX
-                , singleInput "Phi: " (V3.getY v2) setY
-                , singleInput "R: " (V3.getZ v2) setZ
-                ]
-            )
-
-
-fromSpherical : Vec3 -> Vec3
-fromSpherical v =
-    let
-        { x, y, z } =
-            toRecord v
-    in
-        vec3 (z * sin x * cos y) (z * sin x * sin y) (z * cos x)
-
-
-toSpherical : Vec3 -> Vec3
-toSpherical v =
-    let
-        { x, y, z } =
-            toRecord v
-
-        r =
-            V3.length v
-    in
-        vec3 (acos (z / r)) (atan2 y x) r
 
 
 vec3Input : (Vec3 -> msg) -> Vec3 -> Html msg
