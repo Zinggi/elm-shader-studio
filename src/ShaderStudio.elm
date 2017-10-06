@@ -83,6 +83,7 @@ are relative to the camera.
 type alias Uniforms =
     { projectionMatrix : Mat4
     , lightPosition : Vec3
+    , viewPosition : Vec3
     , modelMatrix : Mat4
     , modelViewProjectionMatrix : Mat4
     , normalMatrix : Mat4
@@ -241,14 +242,13 @@ renderModel config model mesh textureDiff textureNorm =
             , modelViewProjectionMatrix = M4.mul viewProjection modelM
             , modelMatrix = modelM
 
-            -- the normal matrix should be the same as the modelViewMatrix, except it shouldn't contain any scaling
-            -- in our case (since the model matrix is the identity) we can just use the view matrix
-            , normalMatrix = view
+            -- the normal matrix should be the same as the modelMatrix, except it shouldn't contain any scaling
+            -- in our case (since the model matrix is the identity) we can just use that
+            , normalMatrix = M4.identity
             , textureDiff = textureDiff
             , textureNorm = textureNorm
-
-            -- since we usually calculate the lightning in view space, transform the light position here
-            , lightPosition = M4.transform view lightPos
+            , lightPosition = lightPos
+            , viewPosition = cameraPos
             }
     in
         renderCullFace config.vertexShader config.fragmentShader mesh uniforms
